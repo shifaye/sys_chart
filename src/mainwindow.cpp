@@ -234,9 +234,6 @@ MainWindow::MainWindow ( QWidget *parent ) :
     cali_win = new CalibrationWindow(this);
     //connect(cali_win,SIGNAL(sendData(bool)),this,SLOT(on_recv_cali_win_status(bool)));
 
-    //initialize player windows in <data statics>
-
-
 }
 
 void MainWindow::receiveData(bool status)
