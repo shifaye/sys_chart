@@ -11,6 +11,7 @@ MainWindow::MainWindow ( QWidget *parent ) :
     m_nLastEventTimeStamp(1000000)
 {
     m_pPlayerThread = new CPlayerThread;
+    m_pTriggerThread_auto = new CTriggerThread;
 
     reference_timestamp = GetGlobalTimeStampInSec();
     this->setFocusPolicy(Qt::StrongFocus);
@@ -233,7 +234,6 @@ MainWindow::MainWindow ( QWidget *parent ) :
 
     cali_win = new CalibrationWindow(this);
     //connect(cali_win,SIGNAL(sendData(bool)),this,SLOT(on_recv_cali_win_status(bool)));
-
 }
 
 void MainWindow::receiveData(bool status)
@@ -414,6 +414,15 @@ void MainWindow::init()
 
     ui->tableWidgetLCM->setHorizontalHeaderItem(14, new QTableWidgetItem("TimeSpan(s)"));
     ui->tableWidgetLCM->setColumnWidth(14, 120);
+
+    ui->tableWidget_TriggerInLog ->setHorizontalHeaderItem(0, new QTableWidgetItem(""));//set the header column;
+    ui->tableWidget_TriggerInLog->setColumnWidth(0, 25);//set the column width;
+
+    ui->tableWidget_TriggerInLog->setHorizontalHeaderItem(1, new QTableWidgetItem("trigger name"));
+    ui->tableWidget_TriggerInLog->setColumnWidth(1, 200);
+
+    ui->tableWidget_TriggerInLog->setHorizontalHeaderItem(2, new QTableWidgetItem("trigger timestamp"));
+    ui->tableWidget_TriggerInLog->setColumnWidth(2, 200);
 }
 
 void MainWindow::OnShowStatusMsg ( QString msg )
@@ -745,6 +754,61 @@ void MainWindow::OnNewExecuteBehaviorPlan(Q_EXECUTE_BEHAVIOR_PLAN execute_behavi
     //printf("current behavior is: %d \n",execute_behavior_plan.n_current_behavior);
     ui->tableWidget->item(DFI_ADP_STATUS, 1)->setText(QString::asprintf("%d",execute_behavior_plan.n_current_behavior ));
     AppendPlotData(DFI_ADP_STATUS, timestamp, 20*execute_behavior_plan.n_current_behavior);
+    QString behavior_name;
+//    KEEP_LANE,                0
+//    CHANGE_LEFT,              1
+//    CHANGE_RIGHT,             2
+//    OVER_LEFT,                3
+//    OVER_RIGHT,               4
+//    HALF_OVER_LEFT,           5
+//    HALF_OVER_RIGHT,          6
+//    CHANGE_LEFT_GLOBAL,       7
+//    CHANGE_RIGHT_GLOBAL,      8
+//    HALF_OVER_LEFT_GLOBAL,    9
+//    HALF_OVER_RIGHT_GLOBAL,   10
+//    STOP_IN_DISTANCE          11
+    switch (execute_behavior_plan.n_current_behavior) {
+    case 0:
+       behavior_name = "lane_keeping";
+       break;
+    case 1:
+        behavior_name = "lane changing left";
+        break;
+    case 2:
+        behavior_name = "lane changing right";
+        break;
+    case 3:
+        behavior_name = "overtaking left";
+        break;
+    case 4:
+        behavior_name = "overtaking right";
+        break;
+    case 5:
+        behavior_name = "half overtaking left";
+        break;
+    case 6:
+        behavior_name = "half overtaking right";
+        break;
+    case 7:
+        behavior_name = "changing left global";
+        break;
+    case 8:
+        behavior_name = "changing right global";
+        break;
+    case 9:
+        behavior_name = "half changing left global";
+        break;
+    case 10:
+        behavior_name = "half changing right global";
+        break;
+    case 11:
+        behavior_name = "stop in distance";
+        break;
+    default:
+        behavior_name = "no trigger";
+        break;
+    }
+    m_pTriggerThread_auto->OnTriggerDetected(behavior_name);
 }
 
 void MainWindow::OnNewPerceptionTsr(Q_PERCEPTION_TSR perception_tsr)
@@ -761,18 +825,77 @@ void MainWindow::OnNewVelodynePoints(Q_VELODYNE_POINTS velodyne_points)
 
 void MainWindow::OnNewTrigger(Q_TRIGGER trigger)
 {
-    if(trigger.m_trigger_type == 0)
-    {
+    int row_count;
+    row_count = ui->tableWidget_TriggerInLog->rowCount();
+    printf("the count of the trigger is :%d\n",row_count);
+    switch(trigger.m_trigger_type){
+    case 0:
         ui->DebugOutput->setText("hello, no trigger");
-    }else if(trigger.m_trigger_type == 1)
+        break;
+    case 1:
         ui->DebugOutput->setText("a curve road scenario");
-    else if(trigger.m_trigger_type == 2 )
+        ui->tableWidget_TriggerInLog->insertRow(0);
+        ui->tableWidget_TriggerInLog->setItem(0, 1, new QTableWidgetItem("a curve road scenario"));
+        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3lf", double(trigger.header.nTimeStamp/1000000))));
+        break;
+    case 2:
         ui->DebugOutput->setText("a ramp scenario");
-    else if(trigger.m_trigger_type == 3 )
+        ui->tableWidget_TriggerInLog->insertRow(0);
+        ui->tableWidget_TriggerInLog->setItem(0, 1, new QTableWidgetItem("a ramp scenario"));
+        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3lf", double(trigger.header.nTimeStamp/1000000))));
+        break;
+    case 3:
         ui->DebugOutput->setText("a cross scenario");
-    else if(trigger.m_trigger_type == 4 )
+        ui->tableWidget_TriggerInLog->insertRow(0);
+        ui->tableWidget_TriggerInLog->setItem(0, 1, new QTableWidgetItem("a cross scenario"));
+        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3lf", double(trigger.header.nTimeStamp/1000000))));
+        break;
+    case 4:
         ui->DebugOutput->setText("a merge scenario");
-    else{}
+        ui->tableWidget_TriggerInLog->insertRow(0);
+        ui->tableWidget_TriggerInLog->setItem(0, 1, new QTableWidgetItem("a merge scenario"));
+        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3lf", double(trigger.header.nTimeStamp/1000000))));
+        break;
+    case 101:
+        ui->DebugOutput->setText("lane keeping");
+        break;
+    case 102:
+        ui->DebugOutput->setText("lane changing left");
+        break;
+    case 103:
+        ui->DebugOutput->setText("lane changing right");
+        break;
+    case 104:
+        ui->DebugOutput->setText("overtaking left");
+        break;
+    case 105:
+        ui->DebugOutput->setText("overtaking right");
+        break;
+    case 106:
+        ui->DebugOutput->setText("half overtaking left");
+        break;
+    case 107:
+        ui->DebugOutput->setText("half overtaking right");
+        break;
+    case 108:
+        ui->DebugOutput->setText("changing left global");
+        break;
+    case 109:
+        ui->DebugOutput->setText("changing right global");
+        break;
+    case 110:
+        ui->DebugOutput->setText("half changing left global");
+        break;
+    case 111:
+        ui->DebugOutput->setText("half changing right global");
+        break;
+    case 112:
+        ui->DebugOutput->setText("stop in distance");
+        break;
+    default:
+        ui->DebugOutput->setText("no trigger");
+        break;
+    }
 }
 
 void MainWindow::AppendPlotData ( int dataFieldIndex, double timestamp, double value )
@@ -1766,4 +1889,9 @@ void MainWindow::OnTableItemClicked(int x, int y)
         emit UpdateChannelBroadCast(x, false);
         return;
     }
+}
+
+void MainWindow::on_pushButton_search_log_clicked()
+{
+
 }

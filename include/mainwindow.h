@@ -51,6 +51,7 @@ public:
     Ui::MainWindow *ui;
     Ui::MainWindow *viewer_ui;
     void keyPressEvent(QKeyEvent  *event);
+    CTriggerThread* m_pTriggerThread_auto;
 
 private:
     QPixmap *indicatorlamp_red;
@@ -202,6 +203,7 @@ private slots:
     void on_pushButton_rsds_toggled(bool checked);
     void on_pushButton_detail_ethernet_toggled(bool checked);
     void on_pushButton_detail_can_toggled(bool checked);
+    void on_pushButton_search_log_clicked();
 };
 
 #endif // MAINWINDOW_H

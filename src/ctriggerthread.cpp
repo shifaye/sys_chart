@@ -35,6 +35,7 @@ void CTriggerThread::PublishLCMMsg()
 
 void CTriggerThread::OnTriggerDetected(QString trigger_name)
 {
+    m_trigger_info.stHeader.nTimeStamp = GetGlobalTimeStampInMicroSec();
     if(trigger_name == "no trigger")
         m_trigger_info.nTriggerContent = 0;
     else if(trigger_name == "curve_road")
@@ -45,8 +46,33 @@ void CTriggerThread::OnTriggerDetected(QString trigger_name)
         m_trigger_info.nTriggerContent = 3;
     else if(trigger_name == "merge")
         m_trigger_info.nTriggerContent = 4;
-    else
-        m_trigger_info.nTriggerContent = 0;
+
+    //automatically detect a behavior...
+    else if(trigger_name == "lane_keeping")
+        m_trigger_info.nTriggerContent = 101;
+    else if(trigger_name == "lane changing left" )
+        m_trigger_info.nTriggerContent = 102;
+    else if(trigger_name == "lane changing right" )
+        m_trigger_info.nTriggerContent = 103;
+    else if(trigger_name == "overtaking left" )
+        m_trigger_info.nTriggerContent = 104;
+    else if(trigger_name == "overtaking right" )
+        m_trigger_info.nTriggerContent = 105;
+    else if(trigger_name == "half overtaking left" )
+        m_trigger_info.nTriggerContent = 106;
+    else if(trigger_name == "half overtaking right" )
+        m_trigger_info.nTriggerContent = 107;
+    else if(trigger_name == "changing left global" )
+        m_trigger_info.nTriggerContent = 108;
+    else if(trigger_name == "changing right global" )
+        m_trigger_info.nTriggerContent = 109;
+    else if(trigger_name == "half changing left global" )
+        m_trigger_info.nTriggerContent = 110;
+    else if(trigger_name == "half changing right global" )
+        m_trigger_info.nTriggerContent = 111;
+    else if(trigger_name == "stop in distance" )
+        m_trigger_info.nTriggerContent = 112;
+    else{}
 
     PublishLCMMsg();
 }

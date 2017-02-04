@@ -135,7 +135,6 @@ void LoggerWindow::InitializeLCM()
  */
 void LoggerWindow::InitializeSignalsAndSlots()
 {
-
     //log_ui related signals and slots;
     connect(log_ui->pushButtonStartRecord, SIGNAL(clicked(bool)), this, SLOT(OnStartRecord()));
     connect(log_ui->pushButtonStopRecord, SIGNAL(clicked(bool)), this, SLOT(OnStopRecord()));
@@ -328,7 +327,6 @@ void LoggerWindow::OnShowLogFileName(QString strFileName)
     this->OnShowStatusMessage(strFileName);
 }
 
-
 /**@brief slot function to update the record status;
  *
  * the record status (including bandwidth, bytestowrite, byteswritten) will be updated every 1 second;
@@ -401,10 +399,6 @@ void LoggerWindow::keyPressEvent(QKeyEvent *event)
 
 }
 
-//void LoggerWindow::OnKeyEventTrigger()
-//{
-
-//}
 void LoggerWindow::UpdateListView()
 {
 

@@ -148,5 +148,6 @@ void CLCMHandler::CallbackPerceptionObstacles(const lcm::ReceiveBuffer *recvBuf,
 void CLCMHandler::CallbackTrigger(const lcm::ReceiveBuffer *recvBuf, const std::string &channelName, const TRIGGER_INFORMATION *msg)
 {
     m_qTrigger.m_trigger_type = msg->nTriggerContent;
+    m_qTrigger.header.nTimeStamp = msg->stHeader.nTimeStamp;
     emit NewTrigger(m_qTrigger);
 }
