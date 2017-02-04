@@ -12,6 +12,7 @@ MainWindow::MainWindow ( QWidget *parent ) :
 {
     m_pPlayerThread = new CPlayerThread;
     m_pTriggerThread_auto = new CTriggerThread;
+    m_pRouteRecordThread = new CRouteThread;
 
     reference_timestamp = GetGlobalTimeStampInSec();
     this->setFocusPolicy(Qt::StrongFocus);
@@ -271,6 +272,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    m_pRouteRecordThread->AppendRouteEnd();
     sys_win->close();//close relevant child windows;
     log_win->close();
     cali_win->close();
@@ -559,8 +561,6 @@ void MainWindow::OnNewVcuVehicleInfo ( Q_VCU_VEHICLE_INFO vcuVehicleInfo )
     model_vcu->setItem(4,2,new QStandardItem(QString::number(vcuVehicleInfo.fSteeringAngle,10,2)));
 
     module_status[0] = 1;
-
-
     return;
 }
 
@@ -616,6 +616,11 @@ void MainWindow::OnNewVehiclePose ( Q_VEHICLE_POSE vehiclePose )
 
     ui->tableWidget->item ( DFI_SPEED, 1 )->setText ( QString::asprintf ( "%.3f", vehiclePose.fSpeed ) );
     AppendPlotData ( DFI_SPEED, timestamp, vehiclePose.fSpeed );
+
+    gps_points.fAltitude = vehiclePose.fAltitude;
+    gps_points.fLatitude = vehiclePose.fLatitude;
+    gps_points.fLongitude = vehiclePose.fLongitude;
+    m_pRouteRecordThread->OnRouteUpdated(gps_points);
     //detailed messages decoding...
     model_vehiclepose->setColumnCount(4);
     model_vehiclepose->setHeaderData(0,Qt::Horizontal,QString::fromLocal8Bit("Timestamp"));
@@ -748,13 +753,16 @@ void MainWindow::OnNewPerceptionObjs(Q_PERCEPTIONED_OBJECTS perception_objects)
 
 void MainWindow::OnNewExecuteBehaviorPlan(Q_EXECUTE_BEHAVIOR_PLAN execute_behavior_plan)
 {
-    double timestamp = GetGlobalTimeStampInSec();
+    TRIGGER_INFO auto_generated_trigger;
+    auto_generated_trigger.header.nTimeStamp = execute_behavior_plan.header.nTimeStamp;
+    printf("the timestamp of plan is:%ld\n",execute_behavior_plan.header.nTimeStamp);
+    auto_generated_trigger.type = AUTOMATIC;
+    double timestamp = GetGlobalTimeStampInMicroSec();
     accumulate_adp_behavior +=1;
     count_adp_behavior = accumulate_adp_behavior;
     //printf("current behavior is: %d \n",execute_behavior_plan.n_current_behavior);
     ui->tableWidget->item(DFI_ADP_STATUS, 1)->setText(QString::asprintf("%d",execute_behavior_plan.n_current_behavior ));
     AppendPlotData(DFI_ADP_STATUS, timestamp, 20*execute_behavior_plan.n_current_behavior);
-    QString behavior_name;
 //    KEEP_LANE,                0
 //    CHANGE_LEFT,              1
 //    CHANGE_RIGHT,             2
@@ -769,46 +777,46 @@ void MainWindow::OnNewExecuteBehaviorPlan(Q_EXECUTE_BEHAVIOR_PLAN execute_behavi
 //    STOP_IN_DISTANCE          11
     switch (execute_behavior_plan.n_current_behavior) {
     case 0:
-       behavior_name = "lane_keeping";
+       auto_generated_trigger.trigger_name = "lane_keeping";
        break;
     case 1:
-        behavior_name = "lane changing left";
+        auto_generated_trigger.trigger_name = "lane changing left";
         break;
     case 2:
-        behavior_name = "lane changing right";
+        auto_generated_trigger.trigger_name = "lane changing right";
         break;
     case 3:
-        behavior_name = "overtaking left";
+        auto_generated_trigger.trigger_name = "overtaking left";
         break;
     case 4:
-        behavior_name = "overtaking right";
+        auto_generated_trigger.trigger_name = "overtaking right";
         break;
     case 5:
-        behavior_name = "half overtaking left";
+        auto_generated_trigger.trigger_name = "half overtaking left";
         break;
     case 6:
-        behavior_name = "half overtaking right";
+        auto_generated_trigger.trigger_name = "half overtaking right";
         break;
     case 7:
-        behavior_name = "changing left global";
+        auto_generated_trigger.trigger_name = "changing left global";
         break;
     case 8:
-        behavior_name = "changing right global";
+        auto_generated_trigger.trigger_name = "changing right global";
         break;
     case 9:
-        behavior_name = "half changing left global";
+        auto_generated_trigger.trigger_name = "half changing left global";
         break;
     case 10:
-        behavior_name = "half changing right global";
+        auto_generated_trigger.trigger_name = "half changing right global";
         break;
     case 11:
-        behavior_name = "stop in distance";
+        auto_generated_trigger.trigger_name = "stop in distance";
         break;
     default:
-        behavior_name = "no trigger";
+        auto_generated_trigger.trigger_name = "no trigger";
         break;
     }
-    m_pTriggerThread_auto->OnTriggerDetected(behavior_name);
+    m_pTriggerThread_auto->OnTriggerDetected(auto_generated_trigger);
 }
 
 void MainWindow::OnNewPerceptionTsr(Q_PERCEPTION_TSR perception_tsr)
@@ -830,70 +838,79 @@ void MainWindow::OnNewTrigger(Q_TRIGGER trigger)
     printf("the count of the trigger is :%d\n",row_count);
     switch(trigger.m_trigger_type){
     case 0:
-        ui->DebugOutput->setText("hello, no trigger");
+//        ui->DebugOutput->setText("hello, no trigger");
         break;
     case 1:
-        ui->DebugOutput->setText("a curve road scenario");
+//        ui->DebugOutput->setText("a curve road scenario");
         ui->tableWidget_TriggerInLog->insertRow(0);
         ui->tableWidget_TriggerInLog->setItem(0, 1, new QTableWidgetItem("a curve road scenario"));
-        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3lf", double(trigger.header.nTimeStamp/1000000))));
+        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3lf", double(trigger.header.nTimeStamp)/1000000)));
         break;
     case 2:
-        ui->DebugOutput->setText("a ramp scenario");
+//        ui->DebugOutput->setText("a ramp scenario");
         ui->tableWidget_TriggerInLog->insertRow(0);
         ui->tableWidget_TriggerInLog->setItem(0, 1, new QTableWidgetItem("a ramp scenario"));
-        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3lf", double(trigger.header.nTimeStamp/1000000))));
+        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3lf", double(trigger.header.nTimeStamp)/1000000)));
         break;
     case 3:
-        ui->DebugOutput->setText("a cross scenario");
+//        ui->DebugOutput->setText("a cross scenario");
         ui->tableWidget_TriggerInLog->insertRow(0);
         ui->tableWidget_TriggerInLog->setItem(0, 1, new QTableWidgetItem("a cross scenario"));
-        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3lf", double(trigger.header.nTimeStamp/1000000))));
+        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3lf", double(trigger.header.nTimeStamp)/1000000)));
         break;
     case 4:
-        ui->DebugOutput->setText("a merge scenario");
+//        ui->DebugOutput->setText("a merge scenario");
         ui->tableWidget_TriggerInLog->insertRow(0);
         ui->tableWidget_TriggerInLog->setItem(0, 1, new QTableWidgetItem("a merge scenario"));
-        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3lf", double(trigger.header.nTimeStamp/1000000))));
+        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3f", double(trigger.header.nTimeStamp)/1000000)));
         break;
     case 101:
-        ui->DebugOutput->setText("lane keeping");
+//        ui->DebugOutput->setText("lane keeping");
+//        ui->tableWidget_TriggerInLog->insertRow(0);
+//        ui->tableWidget_TriggerInLog->setItem(0, 1, new QTableWidgetItem("a lane keeping scenario"));
+//        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3f", double(trigger.header.nTimeStamp/1000000))));
         break;
     case 102:
-        ui->DebugOutput->setText("lane changing left");
+//        ui->DebugOutput->setText("lane changing left");
+        ui->tableWidget_TriggerInLog->insertRow(0);
+        ui->tableWidget_TriggerInLog->setItem(0, 1, new QTableWidgetItem("a lane changing left scenario"));
+        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3f", double(trigger.header.nTimeStamp)/1000000)));
         break;
     case 103:
-        ui->DebugOutput->setText("lane changing right");
+//        ui->DebugOutput->setText("lane changing right");
+        ui->tableWidget_TriggerInLog->insertRow(0);
+        ui->tableWidget_TriggerInLog->setItem(0, 1, new QTableWidgetItem("a lane changing right scenario"));
+        ui->tableWidget_TriggerInLog->setItem(0,2,new QTableWidgetItem(QString::asprintf("%.3f", double(trigger.header.nTimeStamp)/1000000)));
         break;
     case 104:
-        ui->DebugOutput->setText("overtaking left");
+//        ui->DebugOutput->setText("overtaking left");
         break;
     case 105:
-        ui->DebugOutput->setText("overtaking right");
+//        ui->DebugOutput->setText("overtaking right");
         break;
     case 106:
-        ui->DebugOutput->setText("half overtaking left");
+//        ui->DebugOutput->setText("half overtaking left");
         break;
     case 107:
-        ui->DebugOutput->setText("half overtaking right");
+//        ui->DebugOutput->setText("half overtaking right");
         break;
     case 108:
-        ui->DebugOutput->setText("changing left global");
+//        ui->DebugOutput->setText("changing left global");
         break;
     case 109:
-        ui->DebugOutput->setText("changing right global");
+//        ui->DebugOutput->setText("changing right global");
         break;
     case 110:
-        ui->DebugOutput->setText("half changing left global");
+//        ui->DebugOutput->setText("half changing left global");
         break;
     case 111:
-        ui->DebugOutput->setText("half changing right global");
+//        ui->DebugOutput->setText("half changing right global");
         break;
     case 112:
-        ui->DebugOutput->setText("stop in distance");
+//        ui->DebugOutput->setText("stop in distance");
         break;
     default:
-        ui->DebugOutput->setText("no trigger");
+//        ui->DebugOutput->setText("no trigger");
         break;
     }
 }
@@ -1492,7 +1509,7 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
 {
     if(event->key() == Qt::Key_T && event->modifiers() == Qt::ControlModifier){
         if(event->isAutoRepeat()) return;
-        ui->DebugOutput->setText("Top View");
+//        ui->DebugOutput->setText("Top View");
         QDialog *dlg = new QDialog;
         dlg->setWindowTitle("Top View");
 
@@ -1503,30 +1520,30 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
 
     if(event->key() == Qt::Key_H && event->modifiers() == Qt::ControlModifier){
         if(event->isAutoRepeat()) return;
-        ui->DebugOutput->setText("hello,Ctrl + H");
+//        ui->DebugOutput->setText("hello,Ctrl + H");
         this->window()->showMinimized();
 //        log_win->focusWidget();
     }
     if(event->key() == Qt::Key_2 && event->modifiers() == Qt::ControlModifier){
         if(event->isAutoRepeat()) return;
-        ui->DebugOutput->setText("hello,Ctrl + 2");
+//        ui->DebugOutput->setText("hello,Ctrl + 2");
         log_win->show();
     }
     if(event->key() == Qt::Key_3 && event->modifiers() == Qt::ControlModifier){
         if(event->isAutoRepeat()) return;
-        ui->DebugOutput->setText("hello,Ctrl + 3");
+//        ui->DebugOutput->setText("hello,Ctrl + 3");
         sys_win->show();
     }
     if(event->key() == Qt::Key_4 && event->modifiers() == Qt::ControlModifier){
         if(event->isAutoRepeat()) return;
-        ui->DebugOutput->setText("hello,Ctrl + 4");
+//        ui->DebugOutput->setText("hello,Ctrl + 4");
         cali_win->show();
     }
 }
 
 void MainWindow::OnshowMainWindow()
 {
-    ui->DebugOutput->setText("hello,Ctrl + 1");
+//    ui->DebugOutput->setText("hello,Ctrl + 1");
     this->setWindowFlags(this->windowFlags()|Qt::WindowStaysOnTopHint);
     this->showNormal();
 }
